@@ -1,0 +1,11 @@
+## TODO
+- [ ] Rename the variables named by Gemini
+- [ ] Take note of what you learned into another repo (called `bash-man` maybe)
+- Make the execution of the script more user-friendly on Fedora for elderly
+    - [x] Auto-execution of the script upon logging
+- Teach Mom
+    - [ ] Bluetooth connection btw laptop and speaker
+    - [ ] How to next song
+    - [ ] How to pause the music
+    - [ ] How to turn off the music altogether
+    - [ ] How to restart the laptop
