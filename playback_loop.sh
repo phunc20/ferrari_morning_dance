@@ -61,7 +61,7 @@ LOG_FILE="$LOG_DIR/$DATETIME.log"
 log_message() {
     local level="$1"
     #local message="$2"
-    local message="$@"
+    local message="${@:2:$#-1}"
     #echo -e "$(date '+%Y-%m-%d %H:%M:%S') [$level] $message" | tee -a "$LOG_FILE"
     echo -e "$(date '+%Y-%m-%d %H:%M:%S') [$level] $message" >> "$LOG_FILE"
 }
@@ -144,7 +144,7 @@ main_loop() {
         if [[ -z "${RANDOM_INDEX_STR[$DANCE_TYPE]}" ]]; then
             count=${DANCE_TYPE_SONGS_COUNT[$DANCE_TYPE]}
             RANDOM_INDEX_STR[$DANCE_TYPE]=$(shuf -i 0-$(( $count-1 )) | tr '\n' ' ')
-	    log_message "INFO" "\${RANDOM_INDEX_STR[\"$DANCE_TYPE\"]} = ${RANDOM_INDEX_STR[$DANCE_TYPE]} after re-initialization"
+            log_message "INFO" "\${RANDOM_INDEX_STR[\"$DANCE_TYPE\"]} = ${RANDOM_INDEX_STR[$DANCE_TYPE]} after re-initialization"
         fi
 
         # this_type_songs is almost identical to ${DANCE_TYPE_SONGS[$DANCE_TYPE]}, except
@@ -154,7 +154,7 @@ main_loop() {
         while IFS= read -r -d $'\n' song_path; do
             this_type_songs+=("$song_path")
         done <<< "${DANCE_TYPE_SONGS[$DANCE_TYPE]}"
-	# TODO: This conversion repeats a lot. Is it better to hard code this instead?
+        # TODO: This conversion repeats a lot. Is it better to hard code this instead?
 
         index=$(echo "${RANDOM_INDEX_STR[$DANCE_TYPE]}" | awk '{print $NF}')
         song_path=${this_type_songs[$index]}
