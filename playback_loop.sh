@@ -40,6 +40,33 @@ declare -A DANCE_TYPE_SONGS_COUNT
 declare -i ALL_SONGS_COUNT=0
 
 # ==============================================================================
+# LOGGING
+# ==============================================================================
+
+DATETIME=$(date '+%Y-%m-%d_%H:%M:%S')
+
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do # Resolve $SOURCE until the file is no longer a symlink
+  REPO_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  # If $SOURCE was a relative symlink, we need to resolve it
+  # relative to the symlink's parent directory
+  [[ $SOURCE != /* ]] && SOURCE="$REPO_DIR/$SOURCE"
+done
+REPO_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+LOG_DIR="$REPO_DIR/log"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/$DATETIME.log"
+
+log_message() {
+    local level="$1"
+    #local message="$2"
+    local message="$@"
+    #echo -e "$(date '+%Y-%m-%d %H:%M:%S') [$level] $message" | tee -a "$LOG_FILE"
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') [$level] $message" >> "$LOG_FILE"
+}
+
+# ==============================================================================
 # FUNCTIONS
 # ==============================================================================
 
@@ -69,9 +96,7 @@ load_songs() {
     unique_types=($(sort <(echo ${DANCE_TYPE_CYCLE[@]} | tr ' ' '\n') | uniq))
     IFS=$old_IFS
 
-    # debugging echo
-    #echo "unique_types[@] = ${unique_types[@]}"
-    #echo "!unique_types[@] = ${!unique_types[@]}"
+    log_message "DEBUG" "\${unique_types[@]} = ${unique_types[@]}"
     local -i count
 
     for dance_type in "${unique_types[@]}"; do
@@ -85,10 +110,6 @@ load_songs() {
 
         DANCE_TYPE_SONGS_COUNT[$dance_type]=$count
         RANDOM_INDEX_STR[$dance_type]=$(shuf -i 0-$(( $count-1 )) | tr '\n' ' ')
-        # debugging echo
-        #echo "file_list_string = $file_list_string"
-        #echo "(After find) count = $count"
-        #echo "\${RANDOM_INDEX_STR[@]} = ${RANDOM_INDEX_STR[@]}"
         if [ "$count" -gt 0 ]; then
             DANCE_TYPE_SONGS[$dance_type]="$file_list_string"
             echo "  $dance_type: $count"
@@ -118,16 +139,12 @@ main_loop() {
         local DANCE_TYPE="${DANCE_TYPE_CYCLE[$playlist_index]}"
         local current_step=$((playlist_index + 1))
 
-        # debugging echo
-        #echo "(Before) \${RANDOM_INDEX_STR[\$DANCE_TYPE]} = '${RANDOM_INDEX_STR[$DANCE_TYPE]}'"
+
         # 1/ Check whether the index stack in question is empty (i.e. all poped out)
         if [[ -z "${RANDOM_INDEX_STR[$DANCE_TYPE]}" ]]; then
-            #echo "with DANCE_TYPE = $DANCE_TYPE, \$RANDOM_INDEX_STR[\$DANCE_TYPE] is empty"
             count=${DANCE_TYPE_SONGS_COUNT[$DANCE_TYPE]}
-            # debug
-            #echo "\$count = $count"
             RANDOM_INDEX_STR[$DANCE_TYPE]=$(shuf -i 0-$(( $count-1 )) | tr '\n' ' ')
-            #echo "(Initialization) \${RANDOM_INDEX_STR[$DANCE_TYPE]} = ${RANDOM_INDEX_STR[$DANCE_TYPE]}"
+	    log_message "INFO" "\${RANDOM_INDEX_STR[\"$DANCE_TYPE\"]} = ${RANDOM_INDEX_STR[$DANCE_TYPE]} after re-initialization"
         fi
 
         # this_type_songs is almost identical to ${DANCE_TYPE_SONGS[$DANCE_TYPE]}, except
@@ -140,16 +157,20 @@ main_loop() {
 	# TODO: This conversion repeats a lot. Is it better to hard code this instead?
 
         index=$(echo "${RANDOM_INDEX_STR[$DANCE_TYPE]}" | awk '{print $NF}')
-        #echo "index = $index"
         song_path=${this_type_songs[$index]}
-        #echo "song_path = $song_path"
+        #log_message "DEBUG" "\${this_type_songs[@]} =\n${this_type_songs[@]}"
+        log_message "DEBUG" "\${this_type_songs[@]} =\n$(printf "  %s\n" "${this_type_songs[@]}")"
+        log_message "DEBUG" "\$index = $index"
+        log_message "DEBUG" "\$song_path = $song_path"
         printf "\nStep: $current_step/$cycle_length | Dance: $DANCE_TYPE"
+
+        log_message "DEBUG" "(Before pop) \${RANDOM_INDEX_STR[\"$DANCE_TYPE\"]} = '${RANDOM_INDEX_STR[$DANCE_TYPE]}'"
         RANDOM_INDEX_STR[$DANCE_TYPE]=$(echo "${RANDOM_INDEX_STR[$DANCE_TYPE]}" | awk '{NF--; print}')
-        #echo "(After ) \${RANDOM_INDEX_STR[\$DANCE_TYPE]} = '${RANDOM_INDEX_STR[$DANCE_TYPE]}'"
+        log_message "DEBUG" "(After pop) \${RANDOM_INDEX_STR[\"$DANCE_TYPE\"]} = '${RANDOM_INDEX_STR[$DANCE_TYPE]}'"
+
         if [ -f "$song_path" ]; then
             total_played_count+=1
             song_basename=$(basename "$song_path")
-            #echo "song_basename = $song_basename"
             BASENAME_PLAYED_COUNT[$song_basename]+=1
             printf " | (# Played): ${BASENAME_PLAYED_COUNT[$song_basename]}/$total_played_count"
             echo -e "\n-> Playing: $song_basename"
