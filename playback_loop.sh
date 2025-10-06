@@ -31,7 +31,7 @@ declare -A DANCE_SONGS
 declare -A PLAYED_SONGS
 
 # PLAYED_SONGS: Maps song path/basename (string) -> (# played so far) (int)
-declare -A PLAYED_COUNT
+declare -Ai BASENAME_PLAYED_COUNT
 
 # RANDOM_INDEX_STR: Maps dance type (string) -> `shuf -i 0-(#songs -1)` (string)
 declare -A RANDOM_INDEX_STR
@@ -141,55 +141,6 @@ load_songs() {
 }
 
 
-pop_song() {
-    local DANCE_TYPE=$1
-    local song_list_string="${DANCE_SONGS[$DANCE_TYPE]}"
-
-    # debugging echo
-    #echo "\${song_list_string[@]} = ${song_list_string[@]}" >&2
-    #echo "\${#song_list_string[@]} = ${#song_list_string[@]}" >&2
-    if [[ -z "$song_list_string" ]]; then
-        return 1
-    fi
-
-    local -a this_type_songs=()
-    while IFS= read -r -d $'\n' song_path; do
-        this_type_songs+=("$song_path")
-    done <<< "$song_list_string"
-    index=$(echo "${RANDOM_INDEX_STR[$DANCE_TYPE]}" | awk '{print $NF}')
-    song_path=${this_type_songs[$index]}
-    # debugging echo
-    echo "\${song_list_string} = ${song_list_string}" >&2
-    echo "index = $index" >&2
-    echo "song_path = $song_path" >&2
-
-    ##IFS=$'\n' read -ra song_path_array <<< "$song_list_string"
-    ## debugging echo
-    #echo "Look here:" >&2
-    ##echo $(tail -n 1 <(echo $song_list_string)) >&2
-    ##echo "\$song_list_string = $song_list_string" >&2
-    ##echo
-    ##echo "tail = $(tail -1 <(printf $song_list_string))" >&2
-    ##echo "tail = $(tail -1 <(echo $song_list_string))" >&2
-    #local while_tail
-    #IFS=$'\n'
-    #while read -r path; do
-    #    while_tail=$path
-    #done <<< "$song_list_string"
-    ##echo "\$while_tail = $while_tail" >&2
-
-    ## debugging echo
-    echo "(Before) ${RANDOM_INDEX_STR[$DANCE_TYPE]}" >&2
-    RANDOM_INDEX_STR[$DANCE_TYPE]=$(echo "${RANDOM_INDEX_STR[$DANCE_TYPE]}" | awk '{NF--; print}')
-    #echo "${RANDOM_INDEX_STR[$DANCE_TYPE]}" | awk '{NF--; print}' >&2
-    echo "(After ) ${RANDOM_INDEX_STR[$DANCE_TYPE]}" >&2
-
-    #echo "$while_tail"
-    echo "$song_path"
-    return 0
-}
-
-
 main_loop() {
     local song_file
     local playlist_index=0
@@ -197,64 +148,45 @@ main_loop() {
 
     echo -e "\n--- Starting Dance Sequence Loop ---"
 
+    local -i total_played_count=0
     while true; do
         local DANCE_TYPE="${DANCE_TYPE_CYCLE[$playlist_index]}"
         local current_step=$((playlist_index + 1))
 
         # debugging echo
-        #echo "PLAYED_SONGS = ${PLAYED_SONGS[@]}"
-        echo -e "\n[Step $current_step/$cycle_length] | Dance: $DANCE_TYPE | Played: ${#PLAYED_SONGS[@]}/$ALL_SONGS_COUNT"
-
-        # Try to select an unplayed song for the current dance type
-        #song_file=$(select_song_and_mark_played "$DANCE_TYPE")
-        #song_file=$(pop_song "$DANCE_TYPE")
-        # debugging echo
-        #echo "\${PLAYED_SONGS[@]} = ${PLAYED_SONGS[@]}" >&2
-        #local status=$?
-
-        #if [ "$status" -eq 0 ]; then
-        #    # Success scenario
-        #    echo "-> Playing: $(basename "$song_file")"
-
-        #    "$PLAYER" --keep-open=no "$song_file"
-
-        #    if [ $? -ne 0 ]; then
-        #        echo "Error: Failed to play song using '$PLAYER'. Please check your player installation." >&2
-        #    fi
-        #elif [ "$status" -eq 1 ]; then
-        #    # Failure scenario (only happens if the category itself is empty)
-        #    : # Do nothing, just move to the next item in the order
-        #fi
-
-        # Try not to use a subshell
-	# 1/ Check whether index is empty (i.e. all poped out)
-        # debugging echo
-        echo "(Before) \${RANDOM_INDEX_STR[\$DANCE_TYPE]} = '${RANDOM_INDEX_STR[$DANCE_TYPE]}'"
-        #read -p "Press Enter to continue..."
-	if [[ -z "${RANDOM_INDEX_STR[$DANCE_TYPE]}" ]]; then
-	    #echo "with DANCE_TYPE = $DANCE_TYPE, \$RANDOM_INDEX_STR[\$DANCE_TYPE] is empty"
-	    #read -p "Please press Enter to reinitialize RANDOM_INDEX_STR."
+        #echo "(Before) \${RANDOM_INDEX_STR[\$DANCE_TYPE]} = '${RANDOM_INDEX_STR[$DANCE_TYPE]}'"
+	# 1/ Check whether the index stack in question is empty (i.e. all poped out)
+        if [[ -z "${RANDOM_INDEX_STR[$DANCE_TYPE]}" ]]; then
+            #echo "with DANCE_TYPE = $DANCE_TYPE, \$RANDOM_INDEX_STR[\$DANCE_TYPE] is empty"
 	    count=${DANCE_TYPE_SONGS_COUNT[$DANCE_TYPE]}
 	    # debug
 	    #echo "\$count = $count"
 	    RANDOM_INDEX_STR[$DANCE_TYPE]=$(shuf -i 0-$(( $count-1 )) | tr '\n' ' ')
-	    echo "(Initialization) \${RANDOM_INDEX_STR[$DANCE_TYPE]} = ${RANDOM_INDEX_STR[$DANCE_TYPE]}"
+	    #echo "(Initialization) \${RANDOM_INDEX_STR[$DANCE_TYPE]} = ${RANDOM_INDEX_STR[$DANCE_TYPE]}"
 	fi
-        # debugging echo
+
+        # this_type_songs is almost identical to ${DANCE_SONGS[$DANCE_TYPE]}, except
+	# this_type_songs: array
+	# ${DANCE_SONGS[$DANCE_TYPE]}: string
         local -a this_type_songs=()
         while IFS= read -r -d $'\n' song_path; do
             this_type_songs+=("$song_path")
         done <<< "${DANCE_SONGS[$DANCE_TYPE]}"
-        #echo "this_type_songs = ${this_type_songs[@]}"
 
         index=$(echo "${RANDOM_INDEX_STR[$DANCE_TYPE]}" | awk '{print $NF}')
-        echo "index = $index"
+        #echo "index = $index"
         song_path=${this_type_songs[$index]}
-        echo "song_path = $song_path"
+        #echo "song_path = $song_path"
+        printf "\n[Step $current_step/$cycle_length] | Dance: $DANCE_TYPE"
         RANDOM_INDEX_STR[$DANCE_TYPE]=$(echo "${RANDOM_INDEX_STR[$DANCE_TYPE]}" | awk '{NF--; print}')
-        echo "(After ) \${RANDOM_INDEX_STR[\$DANCE_TYPE]} = '${RANDOM_INDEX_STR[$DANCE_TYPE]}'"
+        #echo "(After ) \${RANDOM_INDEX_STR[\$DANCE_TYPE]} = '${RANDOM_INDEX_STR[$DANCE_TYPE]}'"
 	if [ -f "$song_path" ]; then
-            echo "-> Playing: $(basename "$song_path")"
+            total_played_count+=1
+	    song_basename=$(basename "$song_path")
+	    #echo "song_basename = $song_basename"
+	    BASENAME_PLAYED_COUNT[$song_basename]+=1
+            printf " | (# Played): ${BASENAME_PLAYED_COUNT[$song_basename]}/$total_played_count"
+            echo -e "\n-> Playing: $song_basename"
             "$PLAYER" --keep-open=no "$song_path"
 
             if [ $? -ne 0 ]; then
