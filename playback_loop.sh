@@ -20,6 +20,9 @@ DANCE_TYPE_CYCLE=(
 # 4. Accepted file extensions (case-insensitive via `find` -iname/-iregex)
 FILE_EXTENSIONS=("mp3" "ogg" "wav" "flac" "m4a")
 
+# 5. Save the default IFS (since we will alter its value often)
+default_IFS=$IFS
+
 # ==============================================================================
 # GLOBAL STATE (Requires Bash 4.0+ for Associative Arrays)
 # ==============================================================================
@@ -31,6 +34,7 @@ declare -A DANCE_TYPE_SONGS
 declare -Ai BASENAME_PLAYED_COUNT
 
 # RANDOM_INDEX_STR: Maps dance type (string) -> `shuf -i 0-(#songs -1)` (string)
+# Each of RANDOM_INDEX_STR's value works like a stack, although they are strings.
 declare -A RANDOM_INDEX_STR
 
 # DANCE_TYPE_SONGS_COUNT: Maps dance type (string) -> count (int)
@@ -91,10 +95,9 @@ load_songs() {
     # Complete the regex
     pattern_regex=".*\.\($pattern_regex\)"
 
-    old_IFS="$IFS"
     IFS=$'\n'
     unique_types=($(sort <(echo ${DANCE_TYPE_CYCLE[@]} | tr ' ' '\n') | uniq))
-    IFS=$old_IFS
+    IFS=$default_IFS
 
     log_message "DEBUG" "\${unique_types[@]} = ${unique_types[@]}"
     local -i count
@@ -109,7 +112,8 @@ load_songs() {
         fi
 
         DANCE_TYPE_SONGS_COUNT[$dance_type]=$count
-        RANDOM_INDEX_STR[$dance_type]=$(shuf -i 0-$(( $count-1 )) | tr '\n' ' ')
+        initialize_RANDOM_INDEX_STR "$dance_type"
+
         if [ "$count" -gt 0 ]; then
             DANCE_TYPE_SONGS[$dance_type]="$file_list_string"
             echo "  $dance_type: $count"
@@ -136,37 +140,41 @@ main_loop() {
 
     local -i total_played_count=0
     while true; do
-        local DANCE_TYPE="${DANCE_TYPE_CYCLE[$playlist_index]}"
+        local dance_type="${DANCE_TYPE_CYCLE[$playlist_index]}"
         local current_step=$((playlist_index + 1))
 
 
         # 1/ Check whether the index stack in question is empty (i.e. all poped out)
-        if [[ -z "${RANDOM_INDEX_STR[$DANCE_TYPE]}" ]]; then
-            count=${DANCE_TYPE_SONGS_COUNT[$DANCE_TYPE]}
-            RANDOM_INDEX_STR[$DANCE_TYPE]=$(shuf -i 0-$(( $count-1 )) | tr '\n' ' ')
-            log_message "INFO" "\${RANDOM_INDEX_STR[\"$DANCE_TYPE\"]} = ${RANDOM_INDEX_STR[$DANCE_TYPE]} after re-initialization"
+        if [[ -z "${RANDOM_INDEX_STR[$dance_type]}" ]]; then
+            initialize_RANDOM_INDEX_STR "$dance_type" "$index"
+            log_message "INFO" "\${RANDOM_INDEX_STR[\"$dance_type\"]} = ${RANDOM_INDEX_STR[$dance_type]} after re-initialization"
         fi
 
-        # this_type_songs is almost identical to ${DANCE_TYPE_SONGS[$DANCE_TYPE]}, except
+        # this_type_songs is almost identical to ${DANCE_TYPE_SONGS[$dance_type]}, except
         # this_type_songs: array
-        # ${DANCE_TYPE_SONGS[$DANCE_TYPE]}: string
+        # ${DANCE_TYPE_SONGS[$dance_type]}: string
         local -a this_type_songs=()
         while IFS= read -r -d $'\n' song_path; do
             this_type_songs+=("$song_path")
-        done <<< "${DANCE_TYPE_SONGS[$DANCE_TYPE]}"
+        done <<< "${DANCE_TYPE_SONGS[$dance_type]}"
         # TODO: This conversion repeats a lot. Is it better to hard code this instead?
 
-        index=$(echo "${RANDOM_INDEX_STR[$DANCE_TYPE]}" | awk '{print $NF}')
+        index="${RANDOM_INDEX_STR[$dance_type]##* }"
         song_path=${this_type_songs[$index]}
         #log_message "DEBUG" "\${this_type_songs[@]} =\n${this_type_songs[@]}"
         log_message "DEBUG" "\${this_type_songs[@]} =\n$(printf "  %s\n" "${this_type_songs[@]}")"
         log_message "DEBUG" "\$index = $index"
         log_message "DEBUG" "\$song_path = $song_path"
-        printf "\nStep: $current_step/$cycle_length | Dance: $DANCE_TYPE"
+        printf "\nStep: $current_step/$cycle_length | Dance: $dance_type"
 
-        log_message "DEBUG" "(Before pop) \${RANDOM_INDEX_STR[\"$DANCE_TYPE\"]} = '${RANDOM_INDEX_STR[$DANCE_TYPE]}'"
-        RANDOM_INDEX_STR[$DANCE_TYPE]=$(echo "${RANDOM_INDEX_STR[$DANCE_TYPE]}" | awk '{NF--; print}')
-        log_message "DEBUG" "(After pop) \${RANDOM_INDEX_STR[\"$DANCE_TYPE\"]} = '${RANDOM_INDEX_STR[$DANCE_TYPE]}'"
+        RANDOM_INDEX_STR[$dance_type]="${RANDOM_INDEX_STR[$dance_type]% *}"
+
+        # In case where RANDOM_INDEX_STR[$dance_type] is left with only one index,
+        # The above pop action will fail to achieve its mission.
+        # The next `if` serves to fix this.
+        if [[ "$index" == "${RANDOM_INDEX_STR[$dance_type]}" ]]; then
+            RANDOM_INDEX_STR[$dance_type]=""
+        fi
 
         if [ -f "$song_path" ]; then
             total_played_count+=1
@@ -185,6 +193,30 @@ main_loop() {
 
         playlist_index=$(( (playlist_index + 1) % cycle_length ))
     done
+}
+
+# TODO
+# 1/ Deal with the case in which users pass non-int avoid_index
+initialize_RANDOM_INDEX_STR() {
+    local dance_type="$1"
+    local -i count=${DANCE_TYPE_SONGS_COUNT[$dance_type]}
+
+    if [ $# -lt 2 ]; then
+        shuffled_indices=($(shuf -i 0-$(( $count-1 ))))
+    else
+        local -i avoid_index="$2"
+        while true; do
+            shuffled_indices=($(shuf -i 0-$(( $count-1 ))))
+            if [ ${shuffled_indices[0]} -ne $avoid_index ]; then
+                #read -p "avoid_index = $avoid_index, shuffled_indices[0] = ${shuffled_indices[0]}. Press Enter to continue."
+                break
+            fi
+        done
+    fi
+
+    IFS=' '
+    RANDOM_INDEX_STR[$dance_type]="${shuffled_indices[*]}"
+    IFS="$default_IFS"
 }
 
 # ==============================================================================
