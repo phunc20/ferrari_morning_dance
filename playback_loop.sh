@@ -27,9 +27,6 @@ default_IFS=$IFS
 # GLOBAL STATE (Requires Bash 4.0+ for Associative Arrays)
 # ==============================================================================
 
-# DANCE_TYPE_SONGS: dance type (string) -> all song paths (newline-separated string)
-declare -A DANCE_TYPE_SONGS
-
 # BASENAME_PLAYED_COUNT: song file basename (string) -> (# times played so far) (int)
 declare -Ai BASENAME_PLAYED_COUNT
 
@@ -74,7 +71,6 @@ log_message() {
 # FUNCTIONS
 # ==============================================================================
 
-# Function to discover all songs and store them in the DANCE_TYPE_SONGS map.
 load_songs() {
     if [ ! -d "$DANCE_DIR" ]; then
         echo "Error: Dance directory '$DANCE_DIR' not found." >&2
@@ -85,7 +81,6 @@ load_songs() {
     echo "(# songs found)"
 
     local dance_type
-    local file_list_string=""
     local -a unique_types
     local pattern_regex
 
@@ -103,22 +98,23 @@ load_songs() {
     local -i count
 
     for dance_type in "${unique_types[@]}"; do
-        file_list_string=""
-        file_list_string=$(find "$DANCE_DIR/$dance_type" -maxdepth 1 -type f \
-            -iregex "$pattern_regex")
-        if [[ -n "$file_list_string" ]]; then
-            # grep -c . counts lines that contain at least one character.
-            count=$(echo -n "$file_list_string" | grep -c .)
-        fi
+        local -a song_paths
+        mapfile -t song_paths < <(
+            find "$DANCE_DIR/$dance_type" -maxdepth 1 -type f -iregex "$pattern_regex"
+        )
+        count=${#song_paths[@]}
 
         DANCE_TYPE_SONGS_COUNT[$dance_type]=$count
-        initialize_RANDOM_INDEX_STR "$dance_type"
+        ALL_SONGS_COUNT+=$count
 
         if [ "$count" -gt 0 ]; then
-            DANCE_TYPE_SONGS[$dance_type]="$file_list_string"
+            local -n song_path_array="DANCE_SONGS_$dance_type"
+            # Copy array content (to avoid overwriting)
+            song_path_array=("${song_paths[@]}")
+            initialize_RANDOM_INDEX_STR "$dance_type"
             echo "  $dance_type: $count"
-            ALL_SONGS_COUNT+=$count
         else
+            # TODO: Change this echo into logging
             echo "Warning: No songs found for '$dance_type' in '$DANCE_DIR/$dance_type'. Skipping." >&2
         fi
     done
@@ -134,38 +130,30 @@ load_songs() {
 main_loop() {
     local song_file
     local -i playlist_index=0
-    local cycle_length=${#DANCE_TYPE_CYCLE[@]}
+    local -i cycle_length=${#DANCE_TYPE_CYCLE[@]}
 
     echo -e "\n--- Starting Dance Sequence Loop ---"
 
     local -i total_played_count=0
+    local -Ai avoid_index_array
     while true; do
         local dance_type="${DANCE_TYPE_CYCLE[$playlist_index]}"
         local current_step=$((playlist_index + 1))
-
+        printf "\nStep: $current_step/$cycle_length | Dance: $dance_type"
 
         # 1/ Check whether the index stack in question is empty (i.e. all poped out)
         if [[ -z "${RANDOM_INDEX_STR[$dance_type]}" ]]; then
-            initialize_RANDOM_INDEX_STR "$dance_type" "$index"
+            initialize_RANDOM_INDEX_STR "$dance_type" "${avoid_index_array[$dance_type]}"
             log_message "INFO" "\${RANDOM_INDEX_STR[\"$dance_type\"]} = ${RANDOM_INDEX_STR[$dance_type]} after re-initialization"
         fi
 
-        # this_type_songs is almost identical to ${DANCE_TYPE_SONGS[$dance_type]}, except
-        # this_type_songs: array
-        # ${DANCE_TYPE_SONGS[$dance_type]}: string
-        local -a this_type_songs=()
-        while IFS= read -r -d $'\n' song_path; do
-            this_type_songs+=("$song_path")
-        done <<< "${DANCE_TYPE_SONGS[$dance_type]}"
-        # TODO: This conversion repeats a lot. Is it better to hard code this instead?
-
+        local -n song_path_array="DANCE_SONGS_$dance_type"
         index="${RANDOM_INDEX_STR[$dance_type]##* }"
-        song_path=${this_type_songs[$index]}
-        #log_message "DEBUG" "\${this_type_songs[@]} =\n${this_type_songs[@]}"
-        log_message "DEBUG" "\${this_type_songs[@]} =\n$(printf "  %s\n" "${this_type_songs[@]}")"
+        song_path=${song_path_array[$index]}
+        #log_message "DEBUG" "\${song_path_array[@]} =\n${song_path_array[@]}"
+        log_message "DEBUG" "\${song_path_array[@]} =\n$(printf "  %s\n" "${song_path_array[@]}")"
         log_message "DEBUG" "\$index = $index"
         log_message "DEBUG" "\$song_path = $song_path"
-        printf "\nStep: $current_step/$cycle_length | Dance: $dance_type"
 
         RANDOM_INDEX_STR[$dance_type]="${RANDOM_INDEX_STR[$dance_type]% *}"
 
@@ -174,14 +162,15 @@ main_loop() {
         # The next `if` serves to fix this.
         if [[ "$index" == "${RANDOM_INDEX_STR[$dance_type]}" ]]; then
             RANDOM_INDEX_STR[$dance_type]=""
+            avoid_index_array[$dance_type]=$index
         fi
 
         if [ -f "$song_path" ]; then
             total_played_count+=1
             song_basename=$(basename "$song_path")
             BASENAME_PLAYED_COUNT[$song_basename]+=1
-            printf " | (# Played): ${BASENAME_PLAYED_COUNT[$song_basename]}/$total_played_count"
             echo -e "\n-> Playing: $song_basename"
+            echo    "   (# Played = ${BASENAME_PLAYED_COUNT[$song_basename]}/$total_played_count)"
             "$PLAYER" --keep-open=no "$song_path"
 
             if [ $? -ne 0 ]; then
@@ -200,6 +189,10 @@ main_loop() {
 initialize_RANDOM_INDEX_STR() {
     local dance_type="$1"
     local -i count=${DANCE_TYPE_SONGS_COUNT[$dance_type]}
+    if [ $count -eq 1 ]; then
+        RANDOM_INDEX_STR[$dance_type]="0"
+	return 0
+    fi
 
     if [ $# -lt 2 ]; then
         shuffled_indices=($(shuf -i 0-$(( $count-1 ))))
@@ -207,8 +200,7 @@ initialize_RANDOM_INDEX_STR() {
         local -i avoid_index="$2"
         while true; do
             shuffled_indices=($(shuf -i 0-$(( $count-1 ))))
-            if [ ${shuffled_indices[0]} -ne $avoid_index ]; then
-                #read -p "avoid_index = $avoid_index, shuffled_indices[0] = ${shuffled_indices[0]}. Press Enter to continue."
+            if [ ${shuffled_indices[-1]} -ne $avoid_index ]; then
                 break
             fi
         done

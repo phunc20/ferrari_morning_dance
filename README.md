@@ -14,6 +14,10 @@
     - Ask LLMs or google to improve `playback_loop.sh`
         - [ ] External command invocation less efficient than Basn parameter expansion?
         - [ ] Re-initialization of `RANDOM_INDEX_STR`'s 1st index may bump into the last index from last time. Avoid this.
+        - [ ] Use nameref instead of (`dance_type: str -> song_paths: str`) dictionary
+        - [ ] Replace all `while read` by `readarray`/`mapfile`?
+        - [ ] Logging level and option to print to stdout (instead of exclusively to log file)
+    - Write tests for `playback_loop.sh`
 
 
 ## Lesson Learned
