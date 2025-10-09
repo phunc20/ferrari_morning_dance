@@ -21,7 +21,9 @@
         - [ ] Replace all `while read` by `readarray`/`mapfile`?
         - [ ] Logging level and option to print to stdout (instead of exclusively to log file)
     - Write tests for `playback_loop.sh`
+    - Add command-line options to `playback_loop.sh`?
     - [ ] Fill up the Usage section in this README to teach users how to use your repo
+    - [ ] Deal with the edge case where, say, `dance/waltz` contains no song file at all.
 
 
 ## Lesson Learned
