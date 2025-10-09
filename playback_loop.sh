@@ -193,7 +193,7 @@ load_songs() {
 
 main_loop() {
     local song_file
-    local -i playlist_index=0
+    local -i zero_based_step=0
     local -i cycle_length=${#DANCE_TYPE_CYCLE[@]}
 
     echo "--- Starting Dance Sequence Loop ---"
@@ -201,10 +201,18 @@ main_loop() {
     local -i total_played_count=0
     local -Ai avoid_index_array
     while true; do
-        local dance_type="${DANCE_TYPE_CYCLE[$playlist_index]}"
-        local current_step=$((playlist_index + 1))
+        local dance_type="${DANCE_TYPE_CYCLE[$zero_based_step]}"
+        local one_based_step=$((zero_based_step + 1))
         clear
-        log_message "INFO" "Step: $current_step/$cycle_length | Dance: $dance_type"
+        log_message "INFO" "Step: $one_based_step/$cycle_length | Dance: $dance_type"
+
+        # Handles the case in which some $DANCE_DIR/$dance_type/ dir is empty
+        if [[ ${DANCE_TYPE_SONGS_COUNT[$dance_type]} -eq 0 ]]; then
+            log_message "WARN" "Dance type \"$dance_type/\" contains 0 song."
+            zero_based_step=$(( (zero_based_step + 1) % cycle_length ))
+            total_played_count+=1
+            continue
+        fi
 
         # 1/ Check whether the index stack in question is empty (i.e. all poped out)
         if [[ -z "${RANDOM_INDEX_STR[$dance_type]}" ]]; then
@@ -247,7 +255,7 @@ main_loop() {
             log_message "WARN" "song_path=\"$song_path\" not exist."
         fi
 
-        playlist_index=$(( (playlist_index + 1) % cycle_length ))
+        zero_based_step=$(( (zero_based_step + 1) % cycle_length ))
     done
 }
 

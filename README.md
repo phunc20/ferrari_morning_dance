@@ -14,7 +14,7 @@
     - [ ] How to restart the laptop
 - Verbessern `playback_loop.sh`
     - Bugs
-        - [ ] Deal with the edge case where, say, `dance/rumba` contains no song file at all.
+        - [x] Deal with the edge case where, say, `dance/rumba` contains no song file at all.
     - Features
         - [x] Logging: Datetime, logging to a file, logging level, etc.
         - Ask LLMs or google to improve `playback_loop.sh`
