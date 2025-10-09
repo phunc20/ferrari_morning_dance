@@ -3,13 +3,50 @@
 # ==============================================================================
 # CONFIGURATION
 # ==============================================================================
+# 0. Options for this script
+usage() {
+    echo "Usage: $0 [-d <dance_dir>] [-l <log_level>] [-s <log_to_stdout_level>]"
+    echo "    -d: Specify the path to the dance directory. (Default to repo/data/dance)"
+    echo "    -l: Specify a logging level among DEBUG, INFO, WARN, ERROR. (Default to DEBUG)"
+    echo "    -s: Specify a logging-to-stdout level among DEBUG, INFO, WARN, ERROR. (Default to INFO)"
+    echo "    -h: Display this help message"
+    exit 1
+}
+
+while getopts "d:l:s:h" opt; do
+    case $opt in
+        d)
+            DANCE_DIR="$OPTARG"
+            ;;
+        l)
+            LOG_LEVEL="$OPTARG"
+            ;;
+        s)
+            LOG_to_stdout_LEVEL="$OPTARG"
+            ;;
+        h)
+            usage
+            ;;
+        \?)
+            #echo "Error: Invalid option -$optstring" >&2
+            usage
+            ;;
+        :)
+            #echo "Error: Option -$OPTARG requires an argument" >&2
+            usage
+            ;;
+    esac
+done
+
+shift $((OPTIND - 1))
+
 # 1. Root directory containing the dance folders (chachacha, tango, etc.)
-#DANCE_DIR="./dance"  # relative path
-DANCE_DIR="$HOME/Music/dance"  # absolute path
+#DANCE_DIR="$HOME/Music/dance"  # absolute path
+DANCE_DIR=${DANCE_DIR:-"./data/dance"}  # relative path
 
 # 2. Command-line media player.
 #    Change 'mpv' to 'mpg123', 'ffplay', or your preferred player.
-PLAYER="mpv"
+PLAYER=${PLAYER:-"mpv"}
 
 # 3. The specified order of dance types.
 DANCE_TYPE_CYCLE=(
@@ -55,9 +92,9 @@ mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/$(date '+%Y-%m-%d_%H:%M:%S').log"
 
 # Only logs with severity levels -ge LOG_LEVEL will be logged
-LOG_LEVEL="DEBUG"
+LOG_LEVEL=${LOG_LEVEL:-"DEBUG"}
 # Only logs with severity levels -ge LOG_to_stdout_LEVEL will be sent to stdout
-LOG_to_stdout_LEVEL="INFO"
+LOG_to_stdout_LEVEL=${LOG_to_stdout_LEVEL:-"INFO"}
 declare -A LOG_LEVEL_NUM=([DEBUG]=10 [INFO]=20 [WARN]=30 [ERROR]=40)
 declare -A ANSI_ESCAPE_CODE=([RESET]="\e[0m" [RED_FG]="\e[31m" [YELLOW_FG]="\e[33m" [GRAY_FG]="\e[90m" [BLUE_FG]="\e[34m")
 declare -A LOG_LEVEL_TO_COLOR=([DEBUG]=GRAY_FG [INFO]=BLUE_FG [WARN]=YELLOW_FG [ERROR]=RED_FG)
@@ -113,6 +150,7 @@ load_songs() {
     log_message "DEBUG" "\${unique_dance_types[@]} = ${unique_dance_types[@]}"
     local -i count
 
+    log_message "INFO" "\$DANCE_DIR = \"$DANCE_DIR\""
     log_message "INFO" "(# songs found)"
     for dance_type in "${unique_dance_types[@]}"; do
         local -a song_paths

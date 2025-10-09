@@ -13,17 +13,18 @@
     - [ ] How to turn off the music altogether
     - [ ] How to restart the laptop
 - Verbessern `playback_loop.sh`
-    - [ ] Logging: Datetime, logging to a file, logging level, etc.
-    - Ask LLMs or google to improve `playback_loop.sh`
-        - [ ] External command invocation less efficient than Basn parameter expansion?
-        - [ ] Re-initialization of `RANDOM_INDEX_STR`'s 1st index may bump into the last index from last time. Avoid this.
-        - [ ] Use nameref instead of (`dance_type: str -> song_paths: str`) dictionary
-        - [ ] Replace all `while read` by `readarray`/`mapfile`?
-        - [ ] Logging level and option to print to stdout (instead of exclusively to log file)
-    - Write tests for `playback_loop.sh`
-    - Add command-line options to `playback_loop.sh`?
-    - [ ] Fill up the Usage section in this README to teach users how to use your repo
-    - [ ] Deal with the edge case where, say, `dance/waltz` contains no song file at all.
+    - Bugs
+        - [ ] Deal with the edge case where, say, `dance/rumba` contains no song file at all.
+    - Features
+        - [x] Logging: Datetime, logging to a file, logging level, etc.
+        - Ask LLMs or google to improve `playback_loop.sh`
+            - [x] External command invocation less efficient than Basn parameter expansion?
+            - [x] Re-initialization of `RANDOM_INDEX_STR`'s last index may bump into the 1st index from last time. [Think of a stack.] Avoid this.
+            - [x] Use nameref instead of (`dance_type: str -> song_paths: str`) dictionary
+            - [ ] Replace all `while read` by `readarray`/`mapfile`?
+        - Write tests for `playback_loop.sh`
+        - [ ] Add command-line options to `playback_loop.sh`?
+        - [ ] Fill up the Usage section in this README to teach users how to use your repo
 
 
 ## Lesson Learned
