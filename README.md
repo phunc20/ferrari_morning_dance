@@ -1,3 +1,6 @@
+## Usage
+
+
 ## TODO
 - [ ] Rename the variables named by Gemini
 - [ ] Take note of what you learned into another repo (called `bash-man` maybe)
@@ -18,6 +21,7 @@
         - [ ] Replace all `while read` by `readarray`/`mapfile`?
         - [ ] Logging level and option to print to stdout (instead of exclusively to log file)
     - Write tests for `playback_loop.sh`
+    - [ ] Fill up the Usage section in this README to teach users how to use your repo
 
 
 ## Lesson Learned

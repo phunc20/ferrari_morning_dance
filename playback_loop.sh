@@ -81,7 +81,6 @@ load_songs() {
     echo "(# songs found)"
 
     local dance_type
-    local -a unique_types
     local pattern_regex
 
     pattern_regex=$(printf "%s\|" "${FILE_EXTENSIONS[@]}")
@@ -90,14 +89,19 @@ load_songs() {
     # Complete the regex
     pattern_regex=".*\.\($pattern_regex\)"
 
-    IFS=$'\n'
-    unique_types=($(sort <(echo ${DANCE_TYPE_CYCLE[@]} | tr ' ' '\n') | uniq))
-    IFS=$default_IFS
+    # Use a dictionary (i.e. associative array)
+    # This is faster than external command combination of sort and uniq.
+    local -A _unique_dance_types
+    for dance_type in "${DANCE_TYPE_CYCLE[@]}"; do
+        _unique_dance_types["$dance_type"]=1
+    done
+    # Take all the keys and make it into an array
+    local -a unique_dance_types=("${!_unique_dance_types[@]}")
 
-    log_message "DEBUG" "\${unique_types[@]} = ${unique_types[@]}"
+    log_message "DEBUG" "\${unique_dance_types[@]} = ${unique_dance_types[@]}"
     local -i count
 
-    for dance_type in "${unique_types[@]}"; do
+    for dance_type in "${unique_dance_types[@]}"; do
         local -a song_paths
         mapfile -t song_paths < <(
             find "$DANCE_DIR/$dance_type" -maxdepth 1 -type f -iregex "$pattern_regex"
