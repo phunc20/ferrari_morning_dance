@@ -50,10 +50,11 @@ while [ -L "$SOURCE" ]; do # Resolve $SOURCE until the file is no longer a symli
   [[ $SOURCE != /* ]] && SOURCE="$REPO_DIR/$SOURCE"
 done
 REPO_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+# Not sure if the following oneliner is equiv.
+#REPO_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 # 1. Root directory containing the dance folders (chachacha, tango, etc.)
-#DANCE_DIR="$HOME/Music/dance"  # absolute path
-DANCE_DIR=${DANCE_DIR:-"$REPO_DIR/data/dance"}  # relative path
+DANCE_DIR=${DANCE_DIR:-"$REPO_DIR/data/dance"}
 
 # 2. Command-line media player.
 #    Change 'mpv' to 'mpg123', 'ffplay', or your preferred player.
