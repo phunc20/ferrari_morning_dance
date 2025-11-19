@@ -40,9 +40,20 @@ done
 
 shift $((OPTIND - 1))
 
+# 0. This repo's path on the machine executing `playback_loop.sh`
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do # Resolve $SOURCE until the file is no longer a symlink
+  REPO_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  # If $SOURCE was a relative symlink, we need to resolve it
+  # relative to the symlink's parent directory
+  [[ $SOURCE != /* ]] && SOURCE="$REPO_DIR/$SOURCE"
+done
+REPO_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+
 # 1. Root directory containing the dance folders (chachacha, tango, etc.)
 #DANCE_DIR="$HOME/Music/dance"  # absolute path
-DANCE_DIR=${DANCE_DIR:-"./data/dance"}  # relative path
+DANCE_DIR=${DANCE_DIR:-"$REPO_DIR/data/dance"}  # relative path
 
 # 2. Command-line media player.
 #    Change 'mpv' to 'mpg123', 'ffplay', or your preferred player.
@@ -78,15 +89,6 @@ declare -i ALL_SONGS_COUNT=0
 # ==============================================================================
 # LOGGING
 # ==============================================================================
-SOURCE="${BASH_SOURCE[0]}"
-while [ -L "$SOURCE" ]; do # Resolve $SOURCE until the file is no longer a symlink
-  REPO_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  # If $SOURCE was a relative symlink, we need to resolve it
-  # relative to the symlink's parent directory
-  [[ $SOURCE != /* ]] && SOURCE="$REPO_DIR/$SOURCE"
-done
-REPO_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
 LOG_DIR="$REPO_DIR/log"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/$(date '+%Y-%m-%d_%H:%M:%S').log"
